@@ -1,11 +1,11 @@
+from qiskit import QuantumCircuit, QuantumRegister
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-class XYTCLattice:
+class XYTCCircuit:
     def __init__(self, L: int):
         """
-        Initializes the XYTC lattice on a standard chess board grid.
-        Spins are on the midpoints of the square edges.
+        Initializes a quantum circuit mapped to the provided XYTC lattice.
         """
         self.L = L
         self.num_qubits = 2 * L * L
@@ -16,6 +16,9 @@ class XYTCLattice:
         self.qubit_coords = {}
         
         self._build_lattice()
+        
+        self.qr = QuantumRegister(self.num_qubits, 'q')
+        self.qc = QuantumCircuit(self.qr)
 
     def _h_qubit(self, x, y):
         """Index for horizontal qubit at midpoint of bottom edge of square (x,y)"""
@@ -54,6 +57,50 @@ class XYTCLattice:
                     self._v_qubit(x, y - 1)        # Bottom of vertex
                 ]
                 self.plaquettes.append({'coord': (x, y), 'qubits': p_qubits})
+
+    def bp(self, x: int, y: int):
+        """
+        Applies the Plaquette operator (Pauli-Z) to the vertex at (x, y).
+        """
+        # Find the plaquette at the given coordinates
+        for p in self.plaquettes:
+            if p['coord'] == (x, y):
+                for q_idx in p['qubits']:
+                    self.qc.z(self.qr[q_idx])
+                # Add a barrier for visual clarity in circuit diagrams
+                self.qc.barrier()
+                return
+        raise ValueError(f"No plaquette found at coordinates ({x}, {y})")
+
+    def as_x(self, x: int, y: int):
+        """
+        Applies the Star X operator (Pauli-X) to the square at (x, y).
+        """
+        # Search through both s1 and s2 star lists
+        for s in self.stars_s1 + self.stars_s2:
+            if s['coord'] == (x, y):
+                for q_idx in s['qubits']:
+                    self.qc.x(self.qr[q_idx])
+                self.qc.barrier()
+                return
+        raise ValueError(f"No star found at coordinates ({x}, {y})")
+
+    def as_y(self, x: int, y: int):
+        """
+        Applies the Star Y operator (Pauli-Y) to the square at (x, y).
+        """
+        for s in self.stars_s1 + self.stars_s2:
+            if s['coord'] == (x, y):
+                for q_idx in s['qubits']:
+                    self.qc.y(self.qr[q_idx])
+                self.qc.barrier()
+                return
+        raise ValueError(f"No star found at coordinates ({x}, {y})")
+
+    def draw(self, *args, **kwargs):
+        """Pass-through to visualize the underlying Qiskit circuit."""
+        return self.qc.draw(*args, **kwargs)
+    
 
     def plot(self, ax=None, state_lines=None):
         """
